@@ -16,6 +16,11 @@ from core.flash import flash_device
 # Import queue
 from core.queue import add_job, list_jobs, run_queue
 
+# Import AI agents
+from agents.diagnose import diagnose_device
+from agents.workflow import generate_workflow
+from agents.qa import qa_job
+
 app = typer.Typer()
 console = Console()
 
@@ -76,6 +81,70 @@ def queue_run(
     """Run all queued jobs."""
     run_queue(workers)
 
+# ---------- AI Agent command group ----------
+agent_app = typer.Typer(help="AI agent commands")
+app.add_typer(agent_app, name="agent")
+
+@agent_app.command("diagnose")
+def agent_diagnose(
+    serial: str = typer.Option(..., "--serial", "-s", help="Device serial"),
+    logs: str = typer.Option("", "--logs", help="Additional logs (optional)")
+):
+    """Run AI diagnostics on a device."""
+    # Build device info from DB or basic string
+    from db.database import get_session, init_db
+    from db.models import Device
+    init_db()
+    session = get_session()
+    device = session.query(Device).filter(Device.serial == serial).first()
+    if device:
+        device_info = f"Serial: {device.serial}, Model: {device.model}, Chipset: {device.chipset}, Mode: {device.mode}"
+    else:
+        device_info = f"Serial: {serial} (not found in database)"
+    session.close()
+    result = diagnose_device(device_info, logs)
+    console.print(f"[bold green]AI Diagnosis:[/bold green]\n{result}")
+
+@agent_app.command("workflow")
+def agent_workflow(
+    serial: str = typer.Option(..., "--serial", "-s", help="Device serial"),
+    firmware_id: int = typer.Option(..., "--firmware-id", "-f", help="Firmware ID")
+):
+    """Generate a flashing workflow using AI."""
+    from db.database import get_session, init_db
+    from db.models import Device, Firmware
+    init_db()
+    session = get_session()
+    device = session.query(Device).filter(Device.serial == serial).first()
+    firmware = session.query(Firmware).filter(Firmware.id == firmware_id).first()
+    if device and firmware:
+        device_info = f"Serial: {device.serial}, Model: {device.model}, Chipset: {device.chipset}, Mode: {device.mode}"
+        fw_info = f"Model: {firmware.model}, Version: {firmware.version}, Source: {firmware.source}"
+    else:
+        device_info = f"Serial: {serial}"
+        fw_info = f"Firmware ID: {firmware_id}"
+    session.close()
+    result = generate_workflow(device_info, fw_info)
+    console.print(f"[bold green]AI Workflow:[/bold green]\n{result}")
+
+@agent_app.command("qa")
+def agent_qa(
+    job_id: int = typer.Option(..., "--job-id", help="Job ID to review")
+):
+    """Run AI quality assurance on a job."""
+    from db.database import get_session, init_db
+    from db.models import Job
+    init_db()
+    session = get_session()
+    job = session.query(Job).filter(Job.id == job_id).first()
+    if job:
+        logs = job.logs or "No logs available"
+    else:
+        logs = f"Job {job_id} not found"
+    session.close()
+    result = qa_job(logs)
+    console.print(f"[bold green]AI QA Result:[/bold green]\n{result}")
+
 # ---------- Main commands ----------
 @app.command()
 def detect():
@@ -94,12 +163,6 @@ def flash(
 ):
     """Flash a single device directly."""
     flash_device(serial, firmware_id)
-
-@app.command()
-def agent():
-    """AI agent commands (placeholder)."""
-    console.print("[bold green]AI agents...[/bold green]")
-    console.print("[yellow]This is a placeholder. Will implement agents next.[/yellow]")
 
 if __name__ == "__main__":
     app()
