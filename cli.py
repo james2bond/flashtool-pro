@@ -2,6 +2,7 @@
 import typer
 from rich.console import Console
 from rich.table import Table
+from core.detect import detect_all
 
 app = typer.Typer()
 console = Console()
@@ -9,8 +10,7 @@ console = Console()
 @app.command()
 def detect():
     """Detect connected devices"""
-    console.print("[bold green]Detecting devices...[/bold green]")
-    console.print("[yellow]This is a placeholder. Will implement detection next.[/yellow]")
+    detect_all()
 
 @app.command()
 def identify():
