@@ -1,0 +1,11 @@
+typer
+rich
+click
+pyusb
+pyserial
+requests
+sqlalchemy
+rq
+redis
+python-dotenv
+aider-chat
