@@ -3,6 +3,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 from core.detect import detect_all
+from core.identify import identify_all
 
 app = typer.Typer()
 console = Console()
@@ -15,8 +16,7 @@ def detect():
 @app.command()
 def identify():
     """Identify device model and chipset"""
-    console.print("[bold green]Identifying device...[/bold green]")
-    console.print("[yellow]This is a placeholder. Will implement identification next.[/yellow]")
+    identify_all()
 
 @app.command()
 def flash():
