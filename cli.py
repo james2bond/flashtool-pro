@@ -16,10 +16,14 @@ from core.flash import flash_device
 # Import queue
 from core.queue import add_job, list_jobs, run_queue
 
-# Import AI agents
-from agents.diagnose import diagnose_device
-from agents.workflow import generate_workflow
-from agents.qa import qa_job
+# Import self-learning
+from core.self_learning import get_firmware_success_stats, display_firmware_stats, recommend_firmware
+
+# Import auto-flash
+from core.auto_flash import auto_flash
+
+# Import guide (as guide_mod to avoid name conflict)
+from core import guide as guide_mod
 
 app = typer.Typer()
 console = Console()
@@ -81,69 +85,58 @@ def queue_run(
     """Run all queued jobs."""
     run_queue(workers)
 
-# ---------- AI Agent command group ----------
-agent_app = typer.Typer(help="AI agent commands")
-app.add_typer(agent_app, name="agent")
+# ---------- Self-Learning command group ----------
+learn_app = typer.Typer(help="Self-learning and firmware recommendation")
+app.add_typer(learn_app, name="learn")
 
-@agent_app.command("diagnose")
-def agent_diagnose(
-    serial: str = typer.Option(..., "--serial", "-s", help="Device serial"),
-    logs: str = typer.Option("", "--logs", help="Additional logs (optional)")
+@learn_app.command("stats")
+def learn_stats(
+    model: str = typer.Option("", "--model", help="Filter by device model"),
+    chipset: str = typer.Option("", "--chipset", help="Filter by chipset")
 ):
-    """Run AI diagnostics on a device."""
-    # Build device info from DB or basic string
-    from db.database import get_session, init_db
-    from db.models import Device
-    init_db()
-    session = get_session()
-    device = session.query(Device).filter(Device.serial == serial).first()
-    if device:
-        device_info = f"Serial: {device.serial}, Model: {device.model}, Chipset: {device.chipset}, Mode: {device.mode}"
-    else:
-        device_info = f"Serial: {serial} (not found in database)"
-    session.close()
-    result = diagnose_device(device_info, logs)
-    console.print(f"[bold green]AI Diagnosis:[/bold green]\n{result}")
+    """Show firmware success statistics."""
+    stats = get_firmware_success_stats(model, chipset)
+    display_firmware_stats(stats)
 
-@agent_app.command("workflow")
-def agent_workflow(
-    serial: str = typer.Option(..., "--serial", "-s", help="Device serial"),
-    firmware_id: int = typer.Option(..., "--firmware-id", "-f", help="Firmware ID")
+@learn_app.command("recommend")
+def learn_recommend(
+    model: str = typer.Option("", "--model", help="Device model to recommend for"),
+    chipset: str = typer.Option("", "--chipset", help="Chipset to recommend for")
 ):
-    """Generate a flashing workflow using AI."""
-    from db.database import get_session, init_db
-    from db.models import Device, Firmware
-    init_db()
-    session = get_session()
-    device = session.query(Device).filter(Device.serial == serial).first()
-    firmware = session.query(Firmware).filter(Firmware.id == firmware_id).first()
-    if device and firmware:
-        device_info = f"Serial: {device.serial}, Model: {device.model}, Chipset: {device.chipset}, Mode: {device.mode}"
-        fw_info = f"Model: {firmware.model}, Version: {firmware.version}, Source: {firmware.source}"
-    else:
-        device_info = f"Serial: {serial}"
-        fw_info = f"Firmware ID: {firmware_id}"
-    session.close()
-    result = generate_workflow(device_info, fw_info)
-    console.print(f"[bold green]AI Workflow:[/bold green]\n{result}")
+    """Recommend the best firmware based on past outcomes."""
+    recommend_firmware(model, chipset)
 
-@agent_app.command("qa")
-def agent_qa(
-    job_id: int = typer.Option(..., "--job-id", help="Job ID to review")
+# ---------- Auto-Flash command ----------
+@app.command()
+def auto(
+    firmware_id: int = typer.Option(None, "--firmware-id", "-f", help="Firmware ID to flash for all detected devices (optional)"),
+    use_queue: bool = typer.Option(False, "--use-queue", help="Process queued jobs automatically when devices are detected")
 ):
-    """Run AI quality assurance on a job."""
-    from db.database import get_session, init_db
-    from db.models import Job
-    init_db()
-    session = get_session()
-    job = session.query(Job).filter(Job.id == job_id).first()
-    if job:
-        logs = job.logs or "No logs available"
+    """Watch for USB devices and flash automatically."""
+    auto_flash(firmware_id=firmware_id, use_queue=use_queue)
+
+# ---------- Guide command ----------
+@app.command()
+def guide(
+    device: str = typer.Option(None, "--device", "-d", help="Device type (fastboot, samsung, mediatek, qualcomm, apple, laptop)")
+):
+    """Show interactive guide or device-specific instructions."""
+    if device is None:
+        guide_mod.show_interactive_guide()
+    elif device.lower() == "fastboot":
+        guide_mod.show_fastboot_guide()
+    elif device.lower() == "samsung":
+        guide_mod.show_samsung_guide()
+    elif device.lower() == "mediatek":
+        guide_mod.show_mediatek_guide()
+    elif device.lower() == "qualcomm":
+        guide_mod.show_qualcomm_guide()
+    elif device.lower() == "apple":
+        guide_mod.show_apple_guide()
+    elif device.lower() == "laptop":
+        guide_mod.show_laptop_guide()
     else:
-        logs = f"Job {job_id} not found"
-    session.close()
-    result = qa_job(logs)
-    console.print(f"[bold green]AI QA Result:[/bold green]\n{result}")
+        console.print("[red]Unknown device type. Use one of: fastboot, samsung, mediatek, qualcomm, apple, laptop[/red]")
 
 # ---------- Main commands ----------
 @app.command()
