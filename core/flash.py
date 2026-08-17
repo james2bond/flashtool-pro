@@ -2,7 +2,7 @@ import os
 from rich.console import Console
 from db.database import get_session, init_db
 from db.models import Firmware, Device
-from integrations import fastboot, samsung, mediatek, qualcomm, apple, laptop
+from integrations import fastboot, samsung, mediatek, qualcomm, apple, laptop, nokia, motorola, huawei
 
 console = Console()
 
@@ -40,7 +40,7 @@ def flash_device(serial, firmware_id):
     console.print(f"  Device: {device.model} ({device.serial})")
     console.print(f"  Firmware: {firmware.model} {firmware.version} ({firmware.source})")
 
-    # Determine flashing method based on device mode, chipset, manufacturer
+    # Determine flashing method
     mode = device.mode.upper() if device.mode else ""
     chipset = device.chipset.lower() if device.chipset else ""
     model = device.model.lower() if device.model else ""
@@ -48,17 +48,24 @@ def flash_device(serial, firmware_id):
 
     firmware_path = firmware.file_path or firmware.url
 
-    # Check if it's a laptop by looking for fwupd devices (if mode is unknown and model contains "laptop" or "notebook")
+    # Laptop
     if "laptop" in model or "notebook" in model or "thinkpad" in model or "macbook" in model:
         console.print("[cyan]Detected laptop. Using fwupd...[/cyan]")
         return laptop.flash_laptop(firmware_path)
 
-    # Fastboot mode
-    if mode == "FASTBOOT":
-        console.print("[cyan]Using fastboot flashing method...[/cyan]")
-        return fastboot.flash_fastboot(serial, firmware_path)
+    # Fastboot mode or brands that use fastboot
+    if mode == "FASTBOOT" or any(brand in manufacturer for brand in ["nokia", "motorola", "huawei"]) or any(brand in model for brand in ["nokia", "motorola", "huawei"]):
+        console.print("[cyan]Using fastboot method...[/cyan]")
+        if "nokia" in manufacturer or "nokia" in model:
+            return nokia.flash_nokia(serial, firmware_path)
+        elif "motorola" in manufacturer or "motorola" in model:
+            return motorola.flash_motorola(serial, firmware_path)
+        elif "huawei" in manufacturer or "huawei" in model:
+            return huawei.flash_huawei(serial, firmware_path)
+        else:
+            return fastboot.flash_fastboot(serial, firmware_path)
 
-    # ADB mode (needs reboot to bootloader)
+    # ADB mode
     elif mode == "ADB":
         console.print("[yellow]Device is in ADB mode. Need to reboot to bootloader/download mode first.[/yellow]")
         console.print("Please manually reboot the device to fastboot or download mode, then re-run flash.")
@@ -74,14 +81,13 @@ def flash_device(serial, firmware_id):
         console.print("[cyan]Using MediaTek mtkclient method...[/cyan]")
         return mediatek.flash_mediatek(firmware_path)
 
-    # Qualcomm EDL mode or Qualcomm chipset
+    # Qualcomm EDL or Qualcomm chipset
     elif mode == "EDL" or "qualcomm" in chipset or "sm" in chipset or "msm" in chipset:
         console.print("[cyan]Using Qualcomm EDL method...[/cyan]")
-        # Attempt to find programmer from firmware_path if provided
         programmer = os.path.join(firmware_path, "prog_firehose.mbn") if os.path.isdir(firmware_path) else None
         return qualcomm.flash_qualcomm_edl(firmware_path, programmer)
 
-    # Apple (iPhone/iPad)
+    # Apple
     elif "iphone" in model or "ipad" in model or "apple" in manufacturer:
         console.print("[cyan]Using Apple idevicerestore method...[/cyan]")
         return apple.flash_apple(firmware_path)
