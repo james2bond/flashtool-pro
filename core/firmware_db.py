@@ -87,3 +87,27 @@ def search_known_firmware(brand: str = "", model: str = ""):
         table.add_row(fw["brand"], fw["model"], fw["version"], fw["url"], fw["source"])
     console.print(table)
     return results
+
+import os
+import requests
+from rich import print
+from rich.progress import Progress
+
+def download_firmware(url, sha256, file_path):
+    with Progress() as progress:
+        task = progress.add_task("Downloading firmware", total=None)
+        response = requests.get(url, stream=True)
+        total_size = int(response.headers.get('content-length', 0))
+        progress.update(task, total=total_size)
+        with open(file_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+                    progress.update(task, advance=len(chunk))
+        if sha256:
+            import hashlib
+            with open(file_path, 'rb') as f:
+                checksum = hashlib.sha256(f.read()).hexdigest()
+                if checksum != sha256:
+                    raise ValueError("SHA-256 checksum mismatch")
+        return file_path
