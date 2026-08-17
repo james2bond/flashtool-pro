@@ -8,7 +8,7 @@ def run_idevicerestore(args, timeout=600):
     """Run idevicerestore command."""
     cmd = ["idevicerestore"] + args
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=True)
         console.print(f"[dim]Running: {' '.join(cmd)}[/dim]")
         if result.stdout:
             console.print(result.stdout)

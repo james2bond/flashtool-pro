@@ -7,7 +7,7 @@ def run_fastboot(serial, args):
     """Run a fastboot command for a specific device."""
     cmd = ["fastboot", "-s", serial] + args
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, check=True)
         console.print(f"[dim]Running: {' '.join(cmd)}[/dim]")
         if result.stdout:
             console.print(result.stdout)

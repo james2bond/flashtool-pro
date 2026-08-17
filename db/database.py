@@ -13,4 +13,4 @@ def init_db():
 
 def get_session():
     """Return a new database session."""
-    return SessionLocal()
+    return contextmanager(SessionLocal())

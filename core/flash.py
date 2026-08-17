@@ -8,19 +8,13 @@ console = Console()
 
 def get_device_by_serial(serial):
     """Retrieve device record from DB."""
-    init_db()
-    session = get_session()
-    device = session.query(Device).filter(Device.serial == serial).first()
-    session.close()
-    return device
+    with get_session() as session:
+        return session.query(Device).filter(Device.serial == serial).first()
 
 def get_firmware_by_id(firmware_id):
     """Retrieve firmware record from DB."""
-    init_db()
-    session = get_session()
-    fw = session.query(Firmware).filter(Firmware.id == firmware_id).first()
-    session.close()
-    return fw
+    with get_session() as session:
+        return session.query(Firmware).filter(Firmware.id == firmware_id).first()
 
 def flash_device(serial, firmware_id):
     """Flash a device with the specified firmware."""
